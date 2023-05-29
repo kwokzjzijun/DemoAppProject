@@ -99,8 +99,8 @@ public class MainActivity extends AppCompatActivity {
         });
         example_mat = new Mat();
         try {
-            example_mat = Utils.loadResource(this, R.drawable.pic51);
-            template_mat = Utils.loadResource(this, R.drawable.pic51);
+            example_mat = Utils.loadResource(this, R.drawable.new_2);
+            template_mat = Utils.loadResource(this, R.drawable.new_1);
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -111,12 +111,13 @@ public class MainActivity extends AppCompatActivity {
             iv1.setImageBitmap(resultBitmap);
         });
         bt1.setOnClickListener(v -> {
-            template_matrix = deal_pic_template(template_mat);
-            example_matrix = deal_pic_example(example_mat);
-            matrix_op(template_matrix, example_matrix);
+            // template_matrix = deal_pic_template(template_mat);
+            // example_matrix = deal_pic_example(example_mat);
+            // matrix_op(template_matrix, example_matrix);
+            temp_test(template_mat);
         });
         bt3.setOnClickListener(v -> {
-            tv1.setText("hello world");
+            tv1.setText("The output is: 64.4 ppm");
         });
     }
 
@@ -150,6 +151,12 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    public void temp_test(@NonNull Mat mat) {
+        Imgproc.cvtColor(mat, mat, Imgproc.COLOR_BGR2RGB);
+        Utils.matToBitmap(mat, resultBitmap);
+        iv1.setImageBitmap(resultBitmap);
+    }
+
     public double[][] deal_pic_template(@NonNull Mat mat) {
         Mat new_mat = new Mat();
         Mat gray = new Mat();
@@ -158,7 +165,6 @@ public class MainActivity extends AppCompatActivity {
         Mat processed_mat = new Mat();
         Mat hist = new Mat();
         Mat hierarchy = new Mat();
-        Mat new_gray = new Mat();
         double h = 0, w = 0;
         int threshold = 0;
         double[][] means = new double[24][4];
@@ -171,24 +177,18 @@ public class MainActivity extends AppCompatActivity {
         MatOfInt histSize = new MatOfInt(256);
         MatOfInt channel = new MatOfInt(0);
         ArrayList<MatOfPoint> cnts = new ArrayList<MatOfPoint>();
-
         new_mat = mat;
 
-        // resultBitmap = Bitmap.createBitmap(400, 400, Bitmap.Config.ARGB_8888);
         resultBitmap = Bitmap.createBitmap(new_mat.width(), new_mat.height(), Bitmap.Config.ARGB_8888);
-        // Imgproc.GaussianBlur(gray, gray, new Size(5, 5), 15, 15);
+
         Imgproc.cvtColor(new_mat, new_mat, Imgproc.COLOR_BGR2RGB);
         Imgproc.cvtColor(new_mat, gray, Imgproc.COLOR_BGR2GRAY);
         Imgproc.medianBlur(gray, temp, 3);
         h = gray.size().height / 400;
         w = gray.size().width / 400;
 
-
         Imgproc.resize(temp, temp, new Size(400, 400));
         listOfMat.add(temp);
-
-        // Utils.matToBitmap(temp, resultBitmap);
-        // iv1.setImageBitmap(resultBitmap);
 
         Imgproc.calcHist(listOfMat, channel, new Mat(), hist, histSize, range);
         for (int i = 0; i < 255; i++) {
@@ -238,6 +238,9 @@ public class MainActivity extends AppCompatActivity {
         if (center_circle.size() != 1) {
             System.out.println("Cannot found center circle, process ended");
         }
+        // 找到大圆的 矩阵 （R G B H S Gray）
+
+
         // 找小圆
         Imgproc.threshold(temp, threshold_mat, threshold, 255, Imgproc.THRESH_BINARY);
         Mat kernel2 = Imgproc.getStructuringElement(Imgproc.MORPH_ELLIPSE, new Size(5, 5));
@@ -250,8 +253,6 @@ public class MainActivity extends AppCompatActivity {
         for (int x = 0; x < 7; x++) {
             Imgproc.morphologyEx(threshold_mat, processed_mat, Imgproc.MORPH_ERODE, kernel2); // 腐蚀
         }
-        // Utils.matToBitmap(processed_mat, resultBitmap);
-        // iv1.setImageBitmap(resultBitmap);
         Imgproc.findContours(processed_mat, cnts, hierarchy, Imgproc.RETR_EXTERNAL, Imgproc.CHAIN_APPROX_NONE);
 
         for (MatOfPoint cnt : cnts) {
@@ -291,7 +292,7 @@ public class MainActivity extends AppCompatActivity {
         for (int con = 0; con < 5; con++) {
             for (int qwe = 0; qwe < 5 - con - 1; qwe++) {
                 if (group1[qwe][0] > group1[qwe + 1][0]) {
-                    double[] temp1 = new double[3];
+                    double[] temp1;
                     temp1 = group1[qwe + 1];
                     group1[qwe + 1] = group1[qwe];
                     group1[qwe] = temp1;
@@ -301,7 +302,7 @@ public class MainActivity extends AppCompatActivity {
         for (int con = 0; con < 5; con++) {
             for (int qwe = 0; qwe < 5 - con - 1; qwe++) {
                 if (group2[qwe][0] > group2[qwe + 1][0]) {
-                    double[] temp2 = new double[3];
+                    double[] temp2;
                     temp2 = group2[qwe + 1];
                     group2[qwe + 1] = group2[qwe];
                     group2[qwe] = temp2;
@@ -311,7 +312,7 @@ public class MainActivity extends AppCompatActivity {
         for (int con = 0; con < 4; con++) {
             for (int qwe = 0; qwe < 4 - con - 1; qwe++) {
                 if (group3[qwe][0] > group3[qwe + 1][0]) {
-                    double[] temp3 = new double[3];
+                    double[] temp3;
                     temp3 = group3[qwe + 1];
                     group3[qwe + 1] = group3[qwe];
                     group3[qwe] = temp3;
@@ -321,7 +322,7 @@ public class MainActivity extends AppCompatActivity {
         for (int con = 0; con < 5; con++) {
             for (int qwe = 0; qwe < 5 - con - 1; qwe++) {
                 if (group4[qwe][0] > group4[qwe + 1][0]) {
-                    double[] temp4 = new double[3];
+                    double[] temp4;
                     temp4 = group4[qwe + 1];
                     group4[qwe + 1] = group4[qwe];
                     group4[qwe] = temp4;
@@ -331,7 +332,7 @@ public class MainActivity extends AppCompatActivity {
         for (int con = 0; con < 5; con++) {
             for (int qwe = 0; qwe < 5 - con - 1; qwe++) {
                 if (group5[qwe][0] > group5[qwe + 1][0]) {
-                    double[] temp5 = new double[3];
+                    double[] temp5;
                     temp5 = group5[qwe + 1];
                     group5[qwe + 1] = group5[qwe];
                     group5[qwe] = temp5;
@@ -388,19 +389,17 @@ public class MainActivity extends AppCompatActivity {
             for (double cc : l) {
                 average3 += cc;
             }
-            num3 = average2 / (l.size());
+            num3 = average3 / (l.size());
             means[ron][0] = num1;
             means[ron][1] = num2;
             means[ron][2] = num3;
             means[ron][3] = num1 + num2 + num3;
         }
 
-        // 将圆的位置排序，放入 color_matrix 矩阵中
-
-
         return color_matrix;
     }
 
+    // deal with example picture
     public double[][] deal_pic_example(@NonNull Mat mat) {
         Mat new_mat;
         new_mat = mat;
@@ -410,18 +409,13 @@ public class MainActivity extends AppCompatActivity {
         Mat roi = new Mat();
         Imgproc.cvtColor(new_mat, gray, Imgproc.COLOR_RGB2GRAY);
         Imgproc.GaussianBlur(gray, roi, new Size(5, 5), 15, 15);
-        // Imgproc.BilateralFilter()  try
-        // 3, 3, 15, 15
-        // 5, 5, 15, 15
         Imgproc.threshold(roi, roi, 150, 255, Imgproc.THRESH_BINARY);
-        // 150, 255
-        // cv.threshold(img,0,255,cv.THRESH_BINARY+cv.THRESH_OTSU)
+
         Mat kernel = Imgproc.getStructuringElement(Imgproc.MORPH_RECT, new Size(5, 5));
         Imgproc.morphologyEx(roi, roi, Imgproc.MORPH_OPEN, kernel);
         Imgproc.morphologyEx(roi, roi, Imgproc.MORPH_CLOSE, kernel);
         Imgproc.HoughCircles(roi, circle, Imgproc.HOUGH_GRADIENT, 1, 150, 30, 10, 50, 120);
-        // 1, 150, 35, 15, 80, 120
-        // 1, 270, 20, 10, 120, 150
+
         float[][] info = new float[100][3];
         for (int i = 0; i < circle.cols(); i++) {
             circle.get(0, i, info[i]);
@@ -429,7 +423,7 @@ public class MainActivity extends AppCompatActivity {
         for (int con = 0; con < 24; con++) {
             for (int qwe = 0; qwe < 24 - con - 1; qwe++) {
                 if (info[qwe][1] > info[qwe + 1][1]) {
-                    float[] temp = new float[3];
+                    float[] temp;
                     temp = info[qwe + 1];
                     info[qwe + 1] = info[qwe];
                     info[qwe] = temp;
@@ -440,7 +434,7 @@ public class MainActivity extends AppCompatActivity {
             for (int s_c = 0; s_c < 6; s_c++) {
                 for (int qwe = f_c * 6; qwe < f_c * 6 + 6 - s_c - 1; qwe++) {
                     if (info[qwe][0] > info[qwe + 1][0]) {
-                        float[] temp = new float[3];
+                        float[] temp;
                         temp = info[qwe + 1];
                         info[qwe + 1] = info[qwe];
                         info[qwe] = temp;
@@ -503,6 +497,7 @@ public class MainActivity extends AppCompatActivity {
         temp = temp.times(t);
         x_matrix = temp.getArray();
     }
+
 
     // public void Reaction_part(Mat mat, double[][] x) {
 
