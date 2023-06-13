@@ -30,13 +30,16 @@ import org.opencv.core.MatOfInt;
 import org.opencv.core.MatOfPoint;
 import org.opencv.core.MatOfPoint2f;
 import org.opencv.core.Point;
+import org.opencv.core.Rect;
 import org.opencv.core.Scalar;
 import org.opencv.core.Size;
+import org.opencv.imgcodecs.Imgcodecs;
 import org.opencv.imgproc.Imgproc;
 
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.io.SyncFailedException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -50,11 +53,11 @@ public class MainActivity extends AppCompatActivity {
     private ImageView iv1;
     private Mat example_mat; // 标准图
     private Mat template_mat; // 待测图
-    private Mat area; // 反映区域图
+    private Mat main_circle; // 反映区域图
     private Bitmap resultBitmap;
     double[][] template_matrix = new double[24][10];  // 待测图矩阵
     double[][] example_matrix = new double[24][10]; // 标准图矩阵
-    double[][] x_matrix = new double[24][10];  // 参数矩阵
+    double[][] x_matrix = new double[10][10];  // 参数矩阵
     double[][] sample_matrix = new double[1][10];  // 反映区域矩阵
 
     private TextView tv1;
@@ -99,8 +102,8 @@ public class MainActivity extends AppCompatActivity {
         });
         example_mat = new Mat();
         try {
-            example_mat = Utils.loadResource(this, R.drawable.new_2);
-            template_mat = Utils.loadResource(this, R.drawable.new_1);
+            example_mat = Utils.loadResource(this, R.drawable.pic_0_1);
+            template_mat = Utils.loadResource(this, R.drawable.pic_0_1);
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -111,13 +114,13 @@ public class MainActivity extends AppCompatActivity {
             iv1.setImageBitmap(resultBitmap);
         });
         bt1.setOnClickListener(v -> {
-            // template_matrix = deal_pic_template(template_mat);
-            // example_matrix = deal_pic_example(example_mat);
-            // matrix_op(template_matrix, example_matrix);
-            temp_test(template_mat);
+            deal_pic_template(template_mat);
+            deal_pic_example(example_mat);
+
+            matrix_op(template_matrix, example_matrix);
         });
         bt3.setOnClickListener(v -> {
-            tv1.setText("The output is: 64.4 ppm");
+            Reaction_part(main_circle, x_matrix);
         });
     }
 
@@ -151,24 +154,15 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    public void temp_test(@NonNull Mat mat) {
-        Imgproc.cvtColor(mat, mat, Imgproc.COLOR_BGR2RGB);
-        Utils.matToBitmap(mat, resultBitmap);
-        iv1.setImageBitmap(resultBitmap);
-    }
-
-    public double[][] deal_pic_template(@NonNull Mat mat) {
+    public void deal_pic_template(@NonNull Mat mat) {
         Mat new_mat = new Mat();
         Mat gray = new Mat();
         Mat temp = new Mat();
         Mat threshold_mat = new Mat();
-        Mat processed_mat = new Mat();
         Mat hist = new Mat();
         Mat hierarchy = new Mat();
         double h = 0, w = 0;
         int threshold = 0;
-        double[][] means = new double[24][4];
-        double[][] color_matrix = new double[24][10];
         List<Mat> listOfMat = new ArrayList<Mat>();
         ArrayList<Integer> difference = new ArrayList<Integer>();
         ArrayList<double[]> center_circle = new ArrayList<double[]>();
@@ -177,8 +171,9 @@ public class MainActivity extends AppCompatActivity {
         MatOfInt histSize = new MatOfInt(256);
         MatOfInt channel = new MatOfInt(0);
         ArrayList<MatOfPoint> cnts = new ArrayList<MatOfPoint>();
-        new_mat = mat;
 
+        mat = new Mat(mat, new Rect(520, 210, 1480, 1480));
+        new_mat = mat;
         resultBitmap = Bitmap.createBitmap(new_mat.width(), new_mat.height(), Bitmap.Config.ARGB_8888);
 
         Imgproc.cvtColor(new_mat, new_mat, Imgproc.COLOR_BGR2RGB);
@@ -191,79 +186,79 @@ public class MainActivity extends AppCompatActivity {
         listOfMat.add(temp);
 
         Imgproc.calcHist(listOfMat, channel, new Mat(), hist, histSize, range);
-        for (int i = 0; i < 255; i++) {
-            double a = hist.get(i + 1, 0)[0];
-            double b = hist.get(i, 0)[0];
-            difference.add(Math.abs((int) a - (int) b));
+        for (int i=0; i<255; i++) {
+            double a = hist.get(i + 1,0)[0];
+            double b = hist.get(i,0)[0];
+            difference.add(Math.abs((int)a - (int)b));
         }
         int i = 0;
         while (i <= 244) {
             int j = 1;
             while (j <= 25) {
                 int we = i + j;
-                if (difference.get(we) >= 70) {
-                    break;
-                } else {
-                    j++;
-                }
+                if (difference.get(we) >= 70) {break;}
+                else {j++;}
             }
             if (j == 26) {
                 threshold = i;
                 i = 245;
                 break;
-            } else {
-                i += j;
             }
+            else {i += j;}
         }
+
         // 找大圆
         Imgproc.threshold(temp, threshold_mat, threshold, 255, Imgproc.THRESH_BINARY);
         Mat kernel = Imgproc.getStructuringElement(Imgproc.MORPH_RECT, new Size(5, 5));
-        for (int x = 0; x < 4; x++) {
+        for (int x=0; x<4; x++) {
             Imgproc.morphologyEx(threshold_mat, threshold_mat, Imgproc.MORPH_ERODE, kernel); // 腐蚀
         }
-        for (int x = 0; x < 2; x++) {
-            Imgproc.morphologyEx(threshold_mat, processed_mat, Imgproc.MORPH_DILATE, kernel); // 膨胀
+        for (int x=0; x<2; x++) {
+            Imgproc.morphologyEx(threshold_mat, threshold_mat, Imgproc.MORPH_DILATE, kernel); // 膨胀
         }
-        Imgproc.findContours(processed_mat, cnts, hierarchy, Imgproc.RETR_EXTERNAL, Imgproc.CHAIN_APPROX_NONE);
-        for (MatOfPoint cnt : cnts) {
+        Imgproc.findContours(threshold_mat, cnts, hierarchy, Imgproc.RETR_EXTERNAL, Imgproc.CHAIN_APPROX_NONE);
+
+        Point center = new Point();
+        float [] radius = new float [1];
+
+        for (MatOfPoint cnt: cnts) {
             MatOfPoint2f cnt2f = new MatOfPoint2f(cnt.toArray());
             if (Imgproc.contourArea(cnt) > 5000) {
-                Point x = new Point();
-                float[] radius = new float[1];
-                Imgproc.minEnclosingCircle(cnt2f, x, radius);
-                double[] t = {x.x, x.y, (double) radius[0]};
+
+                Imgproc.minEnclosingCircle(cnt2f, center, radius);
+                double[] t = {center.x, center.y, (double)radius[0]};
                 center_circle.add(t);
             }
         }
         if (center_circle.size() != 1) {
             System.out.println("Cannot found center circle, process ended");
         }
-        // 找到大圆的 矩阵 （R G B H S Gray）
 
+        main_circle = new Mat(mat, new Rect((int)(h*(center.x-radius[0])), (int)(w*(center.y-radius[0])), (int)(0.5*(h + w)*radius[0]*2), (int)(0.5*(h + w)*radius[0]*2)));
 
         // 找小圆
         Imgproc.threshold(temp, threshold_mat, threshold, 255, Imgproc.THRESH_BINARY);
         Mat kernel2 = Imgproc.getStructuringElement(Imgproc.MORPH_ELLIPSE, new Size(5, 5));
-        for (int x = 0; x < 4; x++) {
+        for (int x=0; x<2; x++) {
             Imgproc.morphologyEx(threshold_mat, threshold_mat, Imgproc.MORPH_ERODE, kernel2); // 腐蚀
         }
-        for (int x = 0; x < 1; x++) {
+        for (int x=0; x<1; x++) {
             Imgproc.morphologyEx(threshold_mat, threshold_mat, Imgproc.MORPH_DILATE, kernel2); // 膨胀
         }
-        for (int x = 0; x < 7; x++) {
-            Imgproc.morphologyEx(threshold_mat, processed_mat, Imgproc.MORPH_ERODE, kernel2); // 腐蚀
+        for (int x=0; x<3; x++) {
+            Imgproc.morphologyEx(threshold_mat, threshold_mat, Imgproc.MORPH_ERODE, kernel2); // 腐蚀
         }
-        Imgproc.findContours(processed_mat, cnts, hierarchy, Imgproc.RETR_EXTERNAL, Imgproc.CHAIN_APPROX_NONE);
+        Imgproc.findContours(threshold_mat, cnts, hierarchy, Imgproc.RETR_EXTERNAL, Imgproc.CHAIN_APPROX_NONE);
 
-        for (MatOfPoint cnt : cnts) {
+        for (MatOfPoint cnt: cnts) {
             MatOfPoint2f cnt2f = new MatOfPoint2f(cnt.toArray());
-            if (Imgproc.contourArea(cnt) > 500) {
-                if (Imgproc.contourArea(cnt) < 1500) {
+            if (Imgproc.contourArea(cnt) > 300) {
+                if (Imgproc.contourArea(cnt) < 1800) {
                     Point y = new Point();
-                    float[] radius_s = new float[1];
+                    float [] radius_s = new float [1];
                     Imgproc.minEnclosingCircle(cnt2f, y, radius_s);
-                    if ((y.x > 20 && y.x < 380) && (y.y > 20 && y.y < 380)) {
-                        double[] q = {y.x, y.y, (double) radius_s[0]};
+                    if ((y.x > 10 && y.x < 390) && (y.y > 10 && y.y < 390)) {
+                        double[] q = {y.x, y.y, (double)radius_s[0]};
                         if (circles.size() < 24) {
                             circles.add(q);
                         }
@@ -274,14 +269,14 @@ public class MainActivity extends AppCompatActivity {
         if (circles.size() != 24) {
             System.out.println("Cannot found enough small circles, process ended");
         }
+        double [][] temp_lst = circles.toArray(new double[24][]);
 
-        double[][] temp_lst = circles.toArray(new double[24][]);
         // 排序
-        double[][] group1 = new double[5][3];
-        double[][] group2 = new double[5][3];
-        double[][] group3 = new double[4][3];
-        double[][] group4 = new double[5][3];
-        double[][] group5 = new double[5][3];
+        double [][] group1 = new double[5][3];
+        double [][] group2 = new double[5][3];
+        double [][] group3 = new double[4][3];
+        double [][] group4 = new double[5][3];
+        double [][] group5 = new double[5][3];
 
         System.arraycopy(temp_lst, 0, group1, 0, 5);
         System.arraycopy(temp_lst, 5, group2, 0, 5);
@@ -345,20 +340,216 @@ public class MainActivity extends AppCompatActivity {
         System.arraycopy(group4, 0, temp_lst, 14, 5);
         System.arraycopy(group5, 0, temp_lst, 19, 5);
 
+        //计算圆形区域内RGB均值，填入 means 矩阵
+        for (int ron = 0; ron < 24; ron++) {
+            double num1 = 0, num2 = 0, num3 = 0;
+            double average1 = 0, average2 = 0, average3 = 0;
+            int half = ((int) Math.round(temp_lst[ron][2]) / 2);
+            int px = (int) Math.round(temp_lst[ron][1]) - half + 10;
+            int py = (int) Math.round(temp_lst[ron][0]) - half + 10;
+            ArrayList<Double> m = new ArrayList<>();
+            ArrayList<Double> n = new ArrayList<>();
+            ArrayList<Double> l = new ArrayList<>();
+            for (int x = px; x < px + half + 10; x++) {
+                for (int y = py; y < py + half + 10; y++) {
+                    double[] data1 = new_mat.get(x, y);
+                    m.add(data1[0]);
+                    n.add(data1[1]);
+                    l.add(data1[2]);
+                }
+            }
+            for (double aa : m) {
+                average1 += aa;
+            }
+            num1 = average1 / (m.size());
+            for (double bb : n) {
+                average2 += bb;
+            }
+            num2 = average2 / (n.size());
+            for (double cc : l) {
+                average3 += cc;
+            }
+            num3 = average3 / (l.size());
+            template_matrix[ron][0] = num1;
+            template_matrix[ron][1] = num2;
+            template_matrix[ron][2] = num3;
+            template_matrix[ron][3] = Math.pow(num1,2);
+            template_matrix[ron][4] = Math.pow(num2,2);
+            template_matrix[ron][5] = Math.pow(num3,2);
+            template_matrix[ron][6] = num1*num2;
+            template_matrix[ron][7] = num1*num3;
+            template_matrix[ron][8] = num2*num3;
+            template_matrix[ron][9] = 1;
+        }
+
         // 标记出大圆和小圆
         for (int x = 0; x < circles.size(); x++) {
             Imgproc.circle(new_mat, new Point(h * Math.round(temp_lst[x][0]), w * Math.round(temp_lst[x][1])),
-                    ((int) (0.5 * (h + w) * Math.round(temp_lst[x][2])) - 30), new Scalar(255, 0, 0), 3);
+                    ((int)(0.5 * (h + w) * Math.round(temp_lst[x][2]))-30), new Scalar(255, 0, 0), 2);
             Imgproc.putText(new_mat, String.valueOf(x), new Point(h * Math.round(temp_lst[x][0]), w * Math.round(temp_lst[x][1])),
-                    4, 2, new Scalar(255, 0, 0), 2);
+                    4, 2, new Scalar(255,0,0), 2);
         }
         for (int x = 0; x < center_circle.size(); x++) {
-            Imgproc.circle(new_mat, new Point((int) (h * Math.round(center_circle.get(x)[0])), (int) (w * Math.round(center_circle.get(x)[1]))),
-                    ((int) (0.5 * (h + w) * Math.round(center_circle.get(x)[2])) - 70), new Scalar(0, 255, 0), 3);
-        }
-        // 显示标记后的图像
+            Imgproc.circle(new_mat, new Point((int)(h * Math.round(center_circle.get(x)[0])), (int)(w * Math.round(center_circle.get(x)[1]))),
+                    ((int)(0.5 * (h + w) * Math.round(center_circle.get(x)[2]))), new Scalar(0, 255, 0), 2);
+        }// 显示标记后的图像
         Utils.matToBitmap(new_mat, resultBitmap);
         iv1.setImageBitmap(resultBitmap);
+    }
+
+    // deal with example picture
+    public void deal_pic_example(@NonNull Mat mat) {
+        Mat new_mat = new Mat();
+        Mat gray = new Mat();
+        Mat temp = new Mat();
+        Mat threshold_mat = new Mat();
+        Mat hist = new Mat();
+        Mat hierarchy = new Mat();
+        int threshold = 0;
+        List<Mat> listOfMat = new ArrayList<Mat>();
+        ArrayList<Integer> difference = new ArrayList<Integer>();
+        ArrayList<double[]> circles = new ArrayList<double[]>();
+        MatOfFloat range = new MatOfFloat(0, 255);
+        MatOfInt histSize = new MatOfInt(256);
+        MatOfInt channel = new MatOfInt(0);
+        ArrayList<MatOfPoint> cnts = new ArrayList<MatOfPoint>();
+
+        mat = new Mat(mat, new Rect(520, 210, 1480, 1480));
+        new_mat = mat;
+
+        Imgproc.cvtColor(new_mat, new_mat, Imgproc.COLOR_BGR2RGB);
+        Imgproc.cvtColor(new_mat, gray, Imgproc.COLOR_BGR2GRAY);
+        Imgproc.medianBlur(gray, temp, 3);
+
+        Imgproc.resize(temp, temp, new Size(400, 400));
+        listOfMat.add(temp);
+
+        Imgproc.calcHist(listOfMat, channel, new Mat(), hist, histSize, range);
+        for (int i=0; i<255; i++) {
+            double a = hist.get(i + 1,0)[0];
+            double b = hist.get(i,0)[0];
+            difference.add(Math.abs((int)a - (int)b));
+        }
+        int i = 0;
+        while (i <= 244) {
+            int j = 1;
+            while (j <= 25) {
+                int we = i + j;
+                if (difference.get(we) >= 70) {break;}
+                else {j++;}
+            }
+            if (j == 26) {
+                threshold = i;
+                i = 245;
+                break;
+            }
+            else {i += j;}
+        }
+
+        // 找小圆
+        Imgproc.threshold(temp, threshold_mat, threshold, 255, Imgproc.THRESH_BINARY);
+        Mat kernel2 = Imgproc.getStructuringElement(Imgproc.MORPH_ELLIPSE, new Size(5, 5));
+        for (int x=0; x<2; x++) {
+            Imgproc.morphologyEx(threshold_mat, threshold_mat, Imgproc.MORPH_ERODE, kernel2); // 腐蚀
+        }
+        for (int x=0; x<1; x++) {
+            Imgproc.morphologyEx(threshold_mat, threshold_mat, Imgproc.MORPH_DILATE, kernel2); // 膨胀
+        }
+        for (int x=0; x<3; x++) {
+            Imgproc.morphologyEx(threshold_mat, threshold_mat, Imgproc.MORPH_ERODE, kernel2); // 腐蚀
+        }
+        Imgproc.findContours(threshold_mat, cnts, hierarchy, Imgproc.RETR_EXTERNAL, Imgproc.CHAIN_APPROX_NONE);
+
+        for (MatOfPoint cnt: cnts) {
+            MatOfPoint2f cnt2f = new MatOfPoint2f(cnt.toArray());
+            if (Imgproc.contourArea(cnt) > 300) {
+                if (Imgproc.contourArea(cnt) < 1800) {
+                    Point y = new Point();
+                    float [] radius_s = new float [1];
+                    Imgproc.minEnclosingCircle(cnt2f, y, radius_s);
+                    if ((y.x > 10 && y.x < 390) && (y.y > 10 && y.y < 390)) {
+                        double[] q = {y.x, y.y, (double)radius_s[0]};
+                        if (circles.size() < 24) {
+                            circles.add(q);
+                        }
+                    }
+                }
+            }
+        }
+        if (circles.size() != 24) {
+            System.out.println("Cannot found enough small circles, process ended");
+        }
+        double [][] temp_lst = circles.toArray(new double[24][]);
+
+        // 排序
+        double [][] group1 = new double[5][3];
+        double [][] group2 = new double[5][3];
+        double [][] group3 = new double[4][3];
+        double [][] group4 = new double[5][3];
+        double [][] group5 = new double[5][3];
+
+        System.arraycopy(temp_lst, 0, group1, 0, 5);
+        System.arraycopy(temp_lst, 5, group2, 0, 5);
+        System.arraycopy(temp_lst, 10, group3, 0, 4);
+        System.arraycopy(temp_lst, 14, group4, 0, 5);
+        System.arraycopy(temp_lst, 19, group5, 0, 5);
+
+        for (int con = 0; con < 5; con++) {
+            for (int qwe = 0; qwe < 5 - con - 1; qwe++) {
+                if (group1[qwe][0] > group1[qwe + 1][0]) {
+                    double[] temp1;
+                    temp1 = group1[qwe + 1];
+                    group1[qwe + 1] = group1[qwe];
+                    group1[qwe] = temp1;
+                }
+            }
+        }
+        for (int con = 0; con < 5; con++) {
+            for (int qwe = 0; qwe < 5 - con - 1; qwe++) {
+                if (group2[qwe][0] > group2[qwe + 1][0]) {
+                    double[] temp2;
+                    temp2 = group2[qwe + 1];
+                    group2[qwe + 1] = group2[qwe];
+                    group2[qwe] = temp2;
+                }
+            }
+        }
+        for (int con = 0; con < 4; con++) {
+            for (int qwe = 0; qwe < 4 - con - 1; qwe++) {
+                if (group3[qwe][0] > group3[qwe + 1][0]) {
+                    double[] temp3;
+                    temp3 = group3[qwe + 1];
+                    group3[qwe + 1] = group3[qwe];
+                    group3[qwe] = temp3;
+                }
+            }
+        }
+        for (int con = 0; con < 5; con++) {
+            for (int qwe = 0; qwe < 5 - con - 1; qwe++) {
+                if (group4[qwe][0] > group4[qwe + 1][0]) {
+                    double[] temp4;
+                    temp4 = group4[qwe + 1];
+                    group4[qwe + 1] = group4[qwe];
+                    group4[qwe] = temp4;
+                }
+            }
+        }
+        for (int con = 0; con < 5; con++) {
+            for (int qwe = 0; qwe < 5 - con - 1; qwe++) {
+                if (group5[qwe][0] > group5[qwe + 1][0]) {
+                    double[] temp5;
+                    temp5 = group5[qwe + 1];
+                    group5[qwe + 1] = group5[qwe];
+                    group5[qwe] = temp5;
+                }
+            }
+        }
+        System.arraycopy(group1, 0, temp_lst, 0, 5);
+        System.arraycopy(group2, 0, temp_lst, 5, 5);
+        System.arraycopy(group3, 0, temp_lst, 10, 4);
+        System.arraycopy(group4, 0, temp_lst, 14, 5);
+        System.arraycopy(group5, 0, temp_lst, 19, 5);
+
 
         //计算圆形区域内RGB均值，填入 means 矩阵
         for (int ron = 0; ron < 24; ron++) {
@@ -390,101 +581,17 @@ public class MainActivity extends AppCompatActivity {
                 average3 += cc;
             }
             num3 = average3 / (l.size());
-            means[ron][0] = num1;
-            means[ron][1] = num2;
-            means[ron][2] = num3;
-            means[ron][3] = num1 + num2 + num3;
+            example_matrix[ron][0] = num1;
+            example_matrix[ron][1] = num2;
+            example_matrix[ron][2] = num3;
+            example_matrix[ron][3] = Math.pow(num1,2);
+            example_matrix[ron][4] = Math.pow(num2,2);
+            example_matrix[ron][5] = Math.pow(num3,2);
+            example_matrix[ron][6] = num1*num2;
+            example_matrix[ron][7] = num1*num3;
+            example_matrix[ron][8] = num2*num3;
+            example_matrix[ron][9] = 1;
         }
-
-        return color_matrix;
-    }
-
-    // deal with example picture
-    public double[][] deal_pic_example(@NonNull Mat mat) {
-        Mat new_mat;
-        new_mat = mat;
-
-        Mat circle = new Mat();
-        Mat gray = new Mat();
-        Mat roi = new Mat();
-        Imgproc.cvtColor(new_mat, gray, Imgproc.COLOR_RGB2GRAY);
-        Imgproc.GaussianBlur(gray, roi, new Size(5, 5), 15, 15);
-        Imgproc.threshold(roi, roi, 150, 255, Imgproc.THRESH_BINARY);
-
-        Mat kernel = Imgproc.getStructuringElement(Imgproc.MORPH_RECT, new Size(5, 5));
-        Imgproc.morphologyEx(roi, roi, Imgproc.MORPH_OPEN, kernel);
-        Imgproc.morphologyEx(roi, roi, Imgproc.MORPH_CLOSE, kernel);
-        Imgproc.HoughCircles(roi, circle, Imgproc.HOUGH_GRADIENT, 1, 150, 30, 10, 50, 120);
-
-        float[][] info = new float[100][3];
-        for (int i = 0; i < circle.cols(); i++) {
-            circle.get(0, i, info[i]);
-        }
-        for (int con = 0; con < 24; con++) {
-            for (int qwe = 0; qwe < 24 - con - 1; qwe++) {
-                if (info[qwe][1] > info[qwe + 1][1]) {
-                    float[] temp;
-                    temp = info[qwe + 1];
-                    info[qwe + 1] = info[qwe];
-                    info[qwe] = temp;
-                }
-            }
-        }
-        for (int f_c = 0; f_c < 4; f_c++) {
-            for (int s_c = 0; s_c < 6; s_c++) {
-                for (int qwe = f_c * 6; qwe < f_c * 6 + 6 - s_c - 1; qwe++) {
-                    if (info[qwe][0] > info[qwe + 1][0]) {
-                        float[] temp;
-                        temp = info[qwe + 1];
-                        info[qwe + 1] = info[qwe];
-                        info[qwe] = temp;
-                    }
-                }
-            }
-        }
-
-        double[][] colo = new double[24][10];
-        for (int ron = 0; ron < 24; ron++) {
-            double num1 = 0, num2 = 0, num3 = 0;
-            double average1 = 0, average2 = 0, average3 = 0;
-            int half = ((int) info[ron][2] / 2);
-            int px = (int) info[ron][1] - half + 10;
-            int py = (int) info[ron][0] - half + 10;
-            ArrayList<Double> m = new ArrayList<>();
-            ArrayList<Double> n = new ArrayList<>();
-            ArrayList<Double> l = new ArrayList<>();
-            for (int i = px; i < px + half + 10; i++) {
-                for (int j = py; j < py + half + 10; j++) {
-                    double[] data1 = new_mat.get(i, j);
-                    m.add(data1[0]);
-                    n.add(data1[1]);
-                    l.add(data1[2]);
-                }
-            }
-            for (double aa : m) {
-                average1 += aa;
-            }
-            num1 = average1 / (m.size());
-            for (double bb : n) {
-                average2 += bb;
-            }
-            num2 = average2 / (n.size());
-            for (double cc : l) {
-                average3 += cc;
-            }
-            num3 = average3 / (l.size());
-            colo[ron][0] = num1;
-            colo[ron][1] = num2;
-            colo[ron][2] = num3;
-            colo[ron][3] = Math.pow(num1, 2);
-            colo[ron][4] = Math.pow(num2, 2);
-            colo[ron][5] = Math.pow(num3, 2);
-            colo[ron][6] = num1 * num2;
-            colo[ron][7] = num1 * num3;
-            colo[ron][8] = num2 * num3;
-            colo[ron][9] = 1;
-        }
-        return colo;
     }
 
     public void matrix_op(double[][] te, double[][] ex) {
@@ -499,9 +606,51 @@ public class MainActivity extends AppCompatActivity {
     }
 
 
-    // public void Reaction_part(Mat mat, double[][] x) {
+    public void Reaction_part(Mat cir, double[][] x) {
+        Mat kernel = new Mat(10,10, CvType.CV_32F);
+        Mat hsv_mat = new Mat();
+        Mat gray_mat = new Mat();
+        double h = cir.height();
+        double w = cir.width();
+        double center = h/2;
+        double R=0,G=0,B=0,H=0,S=0,V=0,GR=0, number=0;
+        double Concentration;
 
-    // }
+        for (int i=0; i<10; i++) {
+            for (int j=0; j<10; j++) {
+                kernel.get(i,j)[0] = x[i][j];
+            }
+        }
+        // Imgproc.filter2D(cir, cir, -1, kernel, new Point(-1,-1), 0, Core.BORDER_DEFAULT);
+        resultBitmap = Bitmap.createBitmap(cir.width(), cir.height(), Bitmap.Config.ARGB_8888);
+        Utils.matToBitmap(cir, resultBitmap);
+        iv1.setImageBitmap(resultBitmap);
+
+        Imgproc.cvtColor(cir, hsv_mat, Imgproc.COLOR_RGB2HSV);
+        Imgproc.cvtColor(cir, gray_mat, Imgproc.COLOR_RGB2GRAY);
+
+        for (int a=0; a<h; a++) {
+            for (int b=0; b<w; b++) {
+                if (Math.pow(a-center, 2) + Math.pow(b-center, 2) < Math.pow(center, 2)) {
+                    R += cir.get(a, b)[0];
+                    G += cir.get(a, b)[1];
+                    S += hsv_mat.get(a, b)[1];
+                    GR += gray_mat.get(a, b)[0];
+                    number ++;
+                }
+            }
+        }
+        R = R/number;
+        G = G/number;
+        S = S/number;
+        GR = GR/number;
+
+        Concentration = 3.44*R - 11.98*G + 12.04*GR + 6.32*S - 722.95;
+        System.out.println(Concentration);
+        String cc = String.format("%.2f",Concentration);
+        tv1.setTextSize(30);
+        tv1.setText("Final Concentration: " +cc);
+    }
 
     @Override
     protected void onDestroy() {
