@@ -1,7 +1,5 @@
 package com.example.app_test_2;
 
-import Jama.Matrix;
-
 import android.content.Intent;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
@@ -10,7 +8,6 @@ import android.os.Build;
 import android.os.Bundle;
 import android.provider.ContactsContract;
 import android.provider.MediaStore;
-import android.view.View;
 import android.widget.Button;
 import android.widget.ImageView;
 import android.widget.TextView;
@@ -33,16 +30,15 @@ import org.opencv.core.Point;
 import org.opencv.core.Rect;
 import org.opencv.core.Scalar;
 import org.opencv.core.Size;
-import org.opencv.imgcodecs.Imgcodecs;
 import org.opencv.imgproc.Imgproc;
 
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.io.SyncFailedException;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
+
+import Jama.Matrix;
 
 public class MainActivity extends AppCompatActivity {
     final int TAKE_PHOTO = 1;
@@ -55,10 +51,9 @@ public class MainActivity extends AppCompatActivity {
     private Mat template_mat; // 待测图
     private Mat main_circle; // 反映区域图
     private Bitmap resultBitmap;
-    double[][] template_matrix = new double[24][10];  // 待测图矩阵
-    double[][] example_matrix = new double[24][10]; // 标准图矩阵
-    double[][] x_matrix = new double[10][10];  // 参数矩阵
-    double[][] sample_matrix = new double[1][10];  // 反映区域矩阵
+    double[][] template_matrix = new double[24][3];  // 待测图矩阵
+    double[][] example_matrix = new double[24][3]; // 标准图矩阵
+    double[][] x_matrix = new double[3][3];  // 参数矩阵
 
     private TextView tv1;
 
@@ -119,29 +114,23 @@ public class MainActivity extends AppCompatActivity {
 
             matrix_op(template_matrix, example_matrix);
         });
-        bt3.setOnClickListener(v -> {
-            Reaction_part(main_circle, x_matrix);
-        });
+        bt3.setOnClickListener(v -> Reaction_part(main_circle, x_matrix));
     }
 
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
-        switch (requestCode) {
-            case TAKE_PHOTO:
-                if (resultCode == RESULT_OK) {
-                    // 使用try让程序运行在内报错
-                    try {
-                        //将图片保存
-                        resultBitmap = BitmapFactory.decodeStream(getContentResolver().openInputStream(imageUri));
-                        iv_photo.setImageBitmap(resultBitmap);
-                        Utils.bitmapToMat(resultBitmap, template_mat);
-                    } catch (FileNotFoundException e) {
-                        e.printStackTrace();
-                    }
+        if (requestCode == TAKE_PHOTO) {
+            if (resultCode == RESULT_OK) {
+                // 使用try让程序运行在内报错
+                try {
+                    //将图片保存
+                    resultBitmap = BitmapFactory.decodeStream(getContentResolver().openInputStream(imageUri));
+                    iv_photo.setImageBitmap(resultBitmap);
+                    Utils.bitmapToMat(resultBitmap, template_mat);
+                } catch (FileNotFoundException e) {
+                    e.printStackTrace();
                 }
-                break;
-            default:
-                break;
+            }
         }
     }
 
@@ -155,25 +144,30 @@ public class MainActivity extends AppCompatActivity {
     }
 
     public void deal_pic_template(@NonNull Mat mat) {
-        Mat new_mat = new Mat();
+        Mat new_mat;
         Mat gray = new Mat();
         Mat temp = new Mat();
         Mat threshold_mat = new Mat();
         Mat hist = new Mat();
         Mat hierarchy = new Mat();
-        double h = 0, w = 0;
+        double h, w;
         int threshold = 0;
-        List<Mat> listOfMat = new ArrayList<Mat>();
-        ArrayList<Integer> difference = new ArrayList<Integer>();
-        ArrayList<double[]> center_circle = new ArrayList<double[]>();
-        ArrayList<double[]> circles = new ArrayList<double[]>();
+        List<Mat> listOfMat = new ArrayList<>();
+        ArrayList<Integer> difference = new ArrayList<>();
+        ArrayList<double[]> center_circle = new ArrayList<>();
+        ArrayList<double[]> circles = new ArrayList<>();
         MatOfFloat range = new MatOfFloat(0, 255);
         MatOfInt histSize = new MatOfInt(256);
         MatOfInt channel = new MatOfInt(0);
-        ArrayList<MatOfPoint> cnts = new ArrayList<MatOfPoint>();
+        ArrayList<MatOfPoint> cnts = new ArrayList<>();
+
+        if (mat.size().height > mat.size().width) {
+            Core.rotate(mat,mat,Core.ROTATE_90_COUNTERCLOCKWISE);
+        }
 
         mat = new Mat(mat, new Rect(520, 210, 1480, 1480));
         new_mat = mat;
+
         resultBitmap = Bitmap.createBitmap(new_mat.width(), new_mat.height(), Bitmap.Config.ARGB_8888);
 
         Imgproc.cvtColor(new_mat, new_mat, Imgproc.COLOR_BGR2RGB);
@@ -201,7 +195,6 @@ public class MainActivity extends AppCompatActivity {
             }
             if (j == 26) {
                 threshold = i;
-                i = 245;
                 break;
             }
             else {i += j;}
@@ -342,7 +335,7 @@ public class MainActivity extends AppCompatActivity {
 
         //计算圆形区域内RGB均值，填入 means 矩阵
         for (int ron = 0; ron < 24; ron++) {
-            double num1 = 0, num2 = 0, num3 = 0;
+            double num1, num2, num3;
             double average1 = 0, average2 = 0, average3 = 0;
             int half = ((int) Math.round(temp_lst[ron][2]) / 2);
             int px = (int) Math.round(temp_lst[ron][1]) - half + 10;
@@ -373,13 +366,6 @@ public class MainActivity extends AppCompatActivity {
             template_matrix[ron][0] = num1;
             template_matrix[ron][1] = num2;
             template_matrix[ron][2] = num3;
-            template_matrix[ron][3] = Math.pow(num1,2);
-            template_matrix[ron][4] = Math.pow(num2,2);
-            template_matrix[ron][5] = Math.pow(num3,2);
-            template_matrix[ron][6] = num1*num2;
-            template_matrix[ron][7] = num1*num3;
-            template_matrix[ron][8] = num2*num3;
-            template_matrix[ron][9] = 1;
         }
 
         // 标记出大圆和小圆
@@ -399,20 +385,24 @@ public class MainActivity extends AppCompatActivity {
 
     // deal with example picture
     public void deal_pic_example(@NonNull Mat mat) {
-        Mat new_mat = new Mat();
+        Mat new_mat;
         Mat gray = new Mat();
         Mat temp = new Mat();
         Mat threshold_mat = new Mat();
         Mat hist = new Mat();
         Mat hierarchy = new Mat();
         int threshold = 0;
-        List<Mat> listOfMat = new ArrayList<Mat>();
-        ArrayList<Integer> difference = new ArrayList<Integer>();
-        ArrayList<double[]> circles = new ArrayList<double[]>();
+        List<Mat> listOfMat = new ArrayList<>();
+        ArrayList<Integer> difference = new ArrayList<>();
+        ArrayList<double[]> circles = new ArrayList<>();
         MatOfFloat range = new MatOfFloat(0, 255);
         MatOfInt histSize = new MatOfInt(256);
         MatOfInt channel = new MatOfInt(0);
-        ArrayList<MatOfPoint> cnts = new ArrayList<MatOfPoint>();
+        ArrayList<MatOfPoint> cnts = new ArrayList<>();
+
+        if (mat.size().height > mat.size().width) {
+            Core.rotate(mat,mat,Core.ROTATE_90_COUNTERCLOCKWISE);
+        }
 
         mat = new Mat(mat, new Rect(520, 210, 1480, 1480));
         new_mat = mat;
@@ -440,7 +430,6 @@ public class MainActivity extends AppCompatActivity {
             }
             if (j == 26) {
                 threshold = i;
-                i = 245;
                 break;
             }
             else {i += j;}
@@ -553,7 +542,7 @@ public class MainActivity extends AppCompatActivity {
 
         //计算圆形区域内RGB均值，填入 means 矩阵
         for (int ron = 0; ron < 24; ron++) {
-            double num1 = 0, num2 = 0, num3 = 0;
+            double num1, num2, num3;
             double average1 = 0, average2 = 0, average3 = 0;
             int half = ((int) Math.round(temp_lst[ron][2]) / 2);
             int px = (int) Math.round(temp_lst[ron][1]) - half + 10;
@@ -584,13 +573,7 @@ public class MainActivity extends AppCompatActivity {
             example_matrix[ron][0] = num1;
             example_matrix[ron][1] = num2;
             example_matrix[ron][2] = num3;
-            example_matrix[ron][3] = Math.pow(num1,2);
-            example_matrix[ron][4] = Math.pow(num2,2);
-            example_matrix[ron][5] = Math.pow(num3,2);
-            example_matrix[ron][6] = num1*num2;
-            example_matrix[ron][7] = num1*num3;
-            example_matrix[ron][8] = num2*num3;
-            example_matrix[ron][9] = 1;
+
         }
     }
 
@@ -606,21 +589,33 @@ public class MainActivity extends AppCompatActivity {
     }
 
 
-    public void Reaction_part(Mat cir, double[][] x) {
-        Mat kernel = new Mat(10,10, CvType.CV_32F);
+    public void Reaction_part(@NonNull Mat cir, double[][] x) {
+        Mat kernel = new Mat(3,3, CvType.CV_32F);
         Mat hsv_mat = new Mat();
         Mat gray_mat = new Mat();
+        Matrix temp_x = new Matrix(x);
         double h = cir.height();
         double w = cir.width();
         double center = h/2;
-        double R=0,G=0,B=0,H=0,S=0,V=0,GR=0, number=0;
+        double R=0,G=0,S=0,GR=0, number=0;
         double Concentration;
 
-        for (int i=0; i<10; i++) {
-            for (int j=0; j<10; j++) {
+        for (int i=0; i<3; i++) {
+            for (int j=0; j<3; j++) {
                 kernel.get(i,j)[0] = x[i][j];
             }
         }
+        for (int i=0; i<h; i++) {
+            for (int j=0; j<w; j++) {
+                Matrix temp_color = new Matrix(cir.get(i, j), 1);
+                temp_color = temp_color.times(temp_x);
+                double[][] temp = (temp_color).getArray();
+                cir.get(i, j)[0] = temp[0][0];
+                cir.get(i, j)[1] = temp[0][1];
+                cir.get(i, j)[2] = temp[0][2];
+            }
+        }
+
         // Imgproc.filter2D(cir, cir, -1, kernel, new Point(-1,-1), 0, Core.BORDER_DEFAULT);
         resultBitmap = Bitmap.createBitmap(cir.width(), cir.height(), Bitmap.Config.ARGB_8888);
         Utils.matToBitmap(cir, resultBitmap);
@@ -631,7 +626,7 @@ public class MainActivity extends AppCompatActivity {
 
         for (int a=0; a<h; a++) {
             for (int b=0; b<w; b++) {
-                if (Math.pow(a-center, 2) + Math.pow(b-center, 2) < Math.pow(center, 2)) {
+                if (Math.pow(a-center, 2) + Math.pow(b-center*1.5, 2) < Math.pow(center*0.5, 2)) {
                     R += cir.get(a, b)[0];
                     G += cir.get(a, b)[1];
                     S += hsv_mat.get(a, b)[1];
@@ -649,7 +644,16 @@ public class MainActivity extends AppCompatActivity {
         System.out.println(Concentration);
         String cc = String.format("%.2f",Concentration);
         tv1.setTextSize(30);
-        tv1.setText("Final Concentration: " +cc);
+        if (Concentration < 0) {
+            tv1.setText("Final Concentration: 0");
+        }
+        else if (Concentration > 100) {
+            tv1.setText("Final Concentration: 100");
+        }
+        else {
+            tv1.setText("Final Concentration: " + cc);
+        }
+
     }
 
     @Override
