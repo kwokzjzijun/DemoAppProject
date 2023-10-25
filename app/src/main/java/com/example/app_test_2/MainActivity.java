@@ -1,5 +1,6 @@
 package com.example.app_test_2;
 
+import android.content.ContentResolver;
 import android.content.Intent;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
@@ -8,6 +9,8 @@ import android.os.Build;
 import android.os.Bundle;
 import android.provider.ContactsContract;
 import android.provider.MediaStore;
+import android.util.Log;
+import android.webkit.MimeTypeMap;
 import android.widget.Button;
 import android.widget.ImageView;
 import android.widget.TextView;
@@ -35,25 +38,29 @@ import org.opencv.imgproc.Imgproc;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
 
 import Jama.Matrix;
 
 public class MainActivity extends AppCompatActivity {
     final int TAKE_PHOTO = 1;
+
+    private static final int GALLERY_CODE = 19;
     ImageView iv_photo;
     Uri imageUri;
 
-    private Button bt1, bt2, bt3;
+    private Button bt2, bt1, bt3, bt4;
     private ImageView iv1;
-    private Mat example_mat; // 标准图
-    private Mat template_mat; // 待测图
-    private Mat main_circle; // 反映区域图
+    private Mat example_mat; // standard graph
+    private Mat template_mat; // Picture to be tested
+    private Mat main_circle;
     private Bitmap resultBitmap;
-    double[][] template_matrix = new double[24][3];  // 待测图矩阵
-    double[][] example_matrix = new double[24][3]; // 标准图矩阵
-    double[][] x_matrix = new double[3][3];  // 参数矩阵
+    double[][] template_matrix = new double[24][3];
+    double[][] example_matrix = new double[24][3];
+    double[][] x_matrix = new double[3][3];  // parameter matrix
 
     private TextView tv1;
 
@@ -62,13 +69,14 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
         Button btn_1 = findViewById(R.id.btn_takephoto);
-        iv_photo = findViewById(R.id.img_photo);
-
+//        iv_photo = findViewById(R.id.img_photo);
+        iv_photo = findViewById(R.id.imageView);
         iniLoadOpenCV();
 
-        bt1 = findViewById(R.id.button);
-        bt2 = findViewById(R.id.load);
+        bt2 = findViewById(R.id.button);
+        bt1 = findViewById(R.id.load);
         bt3 = findViewById(R.id.output);
+        bt4 = findViewById(R.id.gallery);
         iv1 = findViewById(R.id.imageView);
         tv1 = findViewById(R.id.textView);
 
@@ -83,12 +91,12 @@ public class MainActivity extends AppCompatActivity {
                 e.printStackTrace();
             }
             if (Build.VERSION.SDK_INT >= 24) {
-                //图片的保存路径
+                // Image saving path
                 imageUri = FileProvider.getUriForFile(MainActivity.this, "com.example.takephoto.fileprovider", output);
             } else {
                 imageUri = Uri.fromFile(output);
             }
-            //跳转界面到系统自带的拍照界面
+            // Jump to the system’s own camera interface
             Intent intent = new Intent("android.media.action.IMAGE_CAPTURE");
 
             intent.putExtra(MediaStore.EXTRA_OUTPUT, imageUri);
@@ -97,33 +105,42 @@ public class MainActivity extends AppCompatActivity {
         });
         example_mat = new Mat();
         try {
-            example_mat = Utils.loadResource(this, R.drawable.pic_0_1);
-            template_mat = Utils.loadResource(this, R.drawable.pic_0_1);
+            // may change the default example picture
+            example_mat = Utils.loadResource(this, R.drawable.pic_0_4);
+            template_mat = Utils.loadResource(this, R.drawable.pic_0_4);
         } catch (IOException e) {
             e.printStackTrace();
         }
-        bt2.setOnClickListener(v -> {
+        bt1.setOnClickListener(v -> {
+            // the second button: load the picture
             resultBitmap = Bitmap.createBitmap(example_mat.width(), example_mat.height(), Bitmap.Config.ARGB_8888);
             Imgproc.cvtColor(example_mat, example_mat, Imgproc.COLOR_BGR2RGB);
             Utils.matToBitmap(example_mat, resultBitmap);
             iv1.setImageBitmap(resultBitmap);
         });
-        bt1.setOnClickListener(v -> {
+        //
+        bt2.setOnClickListener(v -> {
+            // the third button: execute the picture
             deal_pic_template(template_mat);
             deal_pic_example(example_mat);
 
             matrix_op(template_matrix, example_matrix);
         });
+        bt4.setOnClickListener(v -> {
+            Intent gallery = new Intent(Intent.ACTION_PICK, MediaStore.Images.Media.EXTERNAL_CONTENT_URI);
+            startActivityForResult(gallery, GALLERY_CODE);
+        });
         bt3.setOnClickListener(v -> Reaction_part(main_circle, x_matrix));
+        // the forth button: output the final value
     }
 
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
         if (requestCode == TAKE_PHOTO) {
             if (resultCode == RESULT_OK) {
-                // 使用try让程序运行在内报错
+                // Use try to let the program run and report errors internally
                 try {
-                    //将图片保存
+                    // save the picture
                     resultBitmap = BitmapFactory.decodeStream(getContentResolver().openInputStream(imageUri));
                     iv_photo.setImageBitmap(resultBitmap);
                     Utils.bitmapToMat(resultBitmap, template_mat);
@@ -132,6 +149,37 @@ public class MainActivity extends AppCompatActivity {
                 }
             }
         }
+        if (requestCode == GALLERY_CODE) {
+            if (data == null) {
+                return;
+            } else {
+                Uri uripic = data.getData();
+                String timeStamp = new SimpleDateFormat("yyyyMMdd_HHmmss").format(new Date());
+                String imageFileName = "JPEG_" + timeStamp + "." + getFileExt(uripic);
+                Log.d("tag", "onActivityResult: Gallery Image Uri:  " + imageFileName);
+//                intent = PhotoUtils.startPhotoZoom(uripic, uri, 2000, 2000);
+//                startActivityForResult(intent, CROP_CODE);
+                resultBitmap = decodeUriAsBitmap(uripic);
+                iv_photo.setImageBitmap(resultBitmap);
+                Utils.bitmapToMat(resultBitmap, template_mat);
+                Imgproc.cvtColor(template_mat, template_mat, Imgproc.COLOR_BGR2RGB);
+            }
+        }
+    }
+    private String getFileExt(Uri contentUri) {
+        ContentResolver c = getContentResolver();
+        MimeTypeMap mime = MimeTypeMap.getSingleton();
+        return mime.getExtensionFromMimeType(c.getType(contentUri));
+    }
+    private Bitmap decodeUriAsBitmap(Uri uri) {
+        Bitmap bitmap = null;
+        try {
+            bitmap = BitmapFactory.decodeStream(getContentResolver().openInputStream(uri));
+        } catch (FileNotFoundException e) {
+            e.printStackTrace();
+            return null;
+        }
+        return bitmap;
     }
 
     private void iniLoadOpenCV() {
@@ -143,7 +191,12 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    // This function is used to deal with the template picture
+    // input: the raw template picture
+    // output: Display the processed pictures and mark the reaction area and standard color chart
+    // return: Get the color matrix of 24 standard color chart
     public void deal_pic_template(@NonNull Mat mat) {
+
         Mat new_mat;
         Mat gray = new Mat();
         Mat temp = new Mat();
@@ -161,6 +214,7 @@ public class MainActivity extends AppCompatActivity {
         MatOfInt channel = new MatOfInt(0);
         ArrayList<MatOfPoint> cnts = new ArrayList<>();
 
+        // Control the direction of image
         if (mat.size().height > mat.size().width) {
             Core.rotate(mat,mat,Core.ROTATE_90_COUNTERCLOCKWISE);
         }
@@ -170,12 +224,12 @@ public class MainActivity extends AppCompatActivity {
 
         resultBitmap = Bitmap.createBitmap(new_mat.width(), new_mat.height(), Bitmap.Config.ARGB_8888);
 
+        // Preprocess images
         Imgproc.cvtColor(new_mat, new_mat, Imgproc.COLOR_BGR2RGB);
         Imgproc.cvtColor(new_mat, gray, Imgproc.COLOR_BGR2GRAY);
         Imgproc.medianBlur(gray, temp, 3);
         h = gray.size().height / 400;
         w = gray.size().width / 400;
-
         Imgproc.resize(temp, temp, new Size(400, 400));
         listOfMat.add(temp);
 
@@ -200,14 +254,14 @@ public class MainActivity extends AppCompatActivity {
             else {i += j;}
         }
 
-        // 找大圆
+        //  Find the circle of the reaction area (large circle)
         Imgproc.threshold(temp, threshold_mat, threshold, 255, Imgproc.THRESH_BINARY);
         Mat kernel = Imgproc.getStructuringElement(Imgproc.MORPH_RECT, new Size(5, 5));
         for (int x=0; x<4; x++) {
-            Imgproc.morphologyEx(threshold_mat, threshold_mat, Imgproc.MORPH_ERODE, kernel); // 腐蚀
+            Imgproc.morphologyEx(threshold_mat, threshold_mat, Imgproc.MORPH_ERODE, kernel);
         }
         for (int x=0; x<2; x++) {
-            Imgproc.morphologyEx(threshold_mat, threshold_mat, Imgproc.MORPH_DILATE, kernel); // 膨胀
+            Imgproc.morphologyEx(threshold_mat, threshold_mat, Imgproc.MORPH_DILATE, kernel);
         }
         Imgproc.findContours(threshold_mat, cnts, hierarchy, Imgproc.RETR_EXTERNAL, Imgproc.CHAIN_APPROX_NONE);
 
@@ -229,17 +283,17 @@ public class MainActivity extends AppCompatActivity {
 
         main_circle = new Mat(mat, new Rect((int)(h*(center.x-radius[0])), (int)(w*(center.y-radius[0])), (int)(0.5*(h + w)*radius[0]*2), (int)(0.5*(h + w)*radius[0]*2)));
 
-        // 找小圆
+        // Find the small circle of the standard color chart
         Imgproc.threshold(temp, threshold_mat, threshold, 255, Imgproc.THRESH_BINARY);
         Mat kernel2 = Imgproc.getStructuringElement(Imgproc.MORPH_ELLIPSE, new Size(5, 5));
         for (int x=0; x<2; x++) {
-            Imgproc.morphologyEx(threshold_mat, threshold_mat, Imgproc.MORPH_ERODE, kernel2); // 腐蚀
+            Imgproc.morphologyEx(threshold_mat, threshold_mat, Imgproc.MORPH_ERODE, kernel2);
         }
         for (int x=0; x<1; x++) {
-            Imgproc.morphologyEx(threshold_mat, threshold_mat, Imgproc.MORPH_DILATE, kernel2); // 膨胀
+            Imgproc.morphologyEx(threshold_mat, threshold_mat, Imgproc.MORPH_DILATE, kernel2);
         }
         for (int x=0; x<3; x++) {
-            Imgproc.morphologyEx(threshold_mat, threshold_mat, Imgproc.MORPH_ERODE, kernel2); // 腐蚀
+            Imgproc.morphologyEx(threshold_mat, threshold_mat, Imgproc.MORPH_ERODE, kernel2);
         }
         Imgproc.findContours(threshold_mat, cnts, hierarchy, Imgproc.RETR_EXTERNAL, Imgproc.CHAIN_APPROX_NONE);
 
@@ -264,7 +318,7 @@ public class MainActivity extends AppCompatActivity {
         }
         double [][] temp_lst = circles.toArray(new double[24][]);
 
-        // 排序
+        // Sort the circles found
         double [][] group1 = new double[5][3];
         double [][] group2 = new double[5][3];
         double [][] group3 = new double[4][3];
@@ -333,7 +387,7 @@ public class MainActivity extends AppCompatActivity {
         System.arraycopy(group4, 0, temp_lst, 14, 5);
         System.arraycopy(group5, 0, temp_lst, 19, 5);
 
-        //计算圆形区域内RGB均值，填入 means 矩阵
+        // Calculate the RGB mean value in the circular area and fill in the means matrix
         for (int ron = 0; ron < 24; ron++) {
             double num1, num2, num3;
             double average1 = 0, average2 = 0, average3 = 0;
@@ -368,7 +422,7 @@ public class MainActivity extends AppCompatActivity {
             template_matrix[ron][2] = num3;
         }
 
-        // 标记出大圆和小圆
+        // Mark the big and small circles in the picture
         for (int x = 0; x < circles.size(); x++) {
             Imgproc.circle(new_mat, new Point(h * Math.round(temp_lst[x][0]), w * Math.round(temp_lst[x][1])),
                     ((int)(0.5 * (h + w) * Math.round(temp_lst[x][2]))-30), new Scalar(255, 0, 0), 2);
@@ -378,12 +432,15 @@ public class MainActivity extends AppCompatActivity {
         for (int x = 0; x < center_circle.size(); x++) {
             Imgproc.circle(new_mat, new Point((int)(h * Math.round(center_circle.get(x)[0])), (int)(w * Math.round(center_circle.get(x)[1]))),
                     ((int)(0.5 * (h + w) * Math.round(center_circle.get(x)[2]))), new Scalar(0, 255, 0), 2);
-        }// 显示标记后的图像
+        }
+        // Display the marked image
         Utils.matToBitmap(new_mat, resultBitmap);
         iv1.setImageBitmap(resultBitmap);
     }
 
-    // deal with example picture
+    // This function is used to deal with the example picture
+    // input: the raw example picture
+    // return: Get the color matrix of 24 standard color chart
     public void deal_pic_example(@NonNull Mat mat) {
         Mat new_mat;
         Mat gray = new Mat();
@@ -407,6 +464,7 @@ public class MainActivity extends AppCompatActivity {
         mat = new Mat(mat, new Rect(520, 210, 1480, 1480));
         new_mat = mat;
 
+        // Preprocess images
         Imgproc.cvtColor(new_mat, new_mat, Imgproc.COLOR_BGR2RGB);
         Imgproc.cvtColor(new_mat, gray, Imgproc.COLOR_BGR2GRAY);
         Imgproc.medianBlur(gray, temp, 3);
@@ -435,7 +493,7 @@ public class MainActivity extends AppCompatActivity {
             else {i += j;}
         }
 
-        // 找小圆
+        // Find the small circle of the standard color chart
         Imgproc.threshold(temp, threshold_mat, threshold, 255, Imgproc.THRESH_BINARY);
         Mat kernel2 = Imgproc.getStructuringElement(Imgproc.MORPH_ELLIPSE, new Size(5, 5));
         for (int x=0; x<2; x++) {
@@ -470,7 +528,7 @@ public class MainActivity extends AppCompatActivity {
         }
         double [][] temp_lst = circles.toArray(new double[24][]);
 
-        // 排序
+        // Sort the circles found
         double [][] group1 = new double[5][3];
         double [][] group2 = new double[5][3];
         double [][] group3 = new double[4][3];
@@ -540,7 +598,7 @@ public class MainActivity extends AppCompatActivity {
         System.arraycopy(group5, 0, temp_lst, 19, 5);
 
 
-        //计算圆形区域内RGB均值，填入 means 矩阵
+        // Calculate the RGB mean value in the circular area and fill in the means matrix
         for (int ron = 0; ron < 24; ron++) {
             double num1, num2, num3;
             double average1 = 0, average2 = 0, average3 = 0;
@@ -577,6 +635,7 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    // This function is used to obtain the color correction matrix for the reaction area
     public void matrix_op(double[][] te, double[][] ex) {
         Matrix t = new Matrix(te);
         Matrix e = new Matrix(ex);
@@ -588,7 +647,9 @@ public class MainActivity extends AppCompatActivity {
         x_matrix = temp.getArray();
     }
 
-
+    // Color correct the reaction area and get the final result
+    // input: Picture of reaction area and color correction matrix
+    // output: Calculated concentration
     public void Reaction_part(@NonNull Mat cir, double[][] x) {
         Mat kernel = new Mat(3,3, CvType.CV_32F);
         Mat hsv_mat = new Mat();
@@ -605,6 +666,7 @@ public class MainActivity extends AppCompatActivity {
                 kernel.get(i,j)[0] = x[i][j];
             }
         }
+        // Apply the color correction matrix to the image
         for (int i=0; i<h; i++) {
             for (int j=0; j<w; j++) {
                 Matrix temp_color = new Matrix(cir.get(i, j), 1);
@@ -617,6 +679,7 @@ public class MainActivity extends AppCompatActivity {
         }
 
         // Imgproc.filter2D(cir, cir, -1, kernel, new Point(-1,-1), 0, Core.BORDER_DEFAULT);
+        // show reaction area
         resultBitmap = Bitmap.createBitmap(cir.width(), cir.height(), Bitmap.Config.ARGB_8888);
         Utils.matToBitmap(cir, resultBitmap);
         iv1.setImageBitmap(resultBitmap);
@@ -624,6 +687,7 @@ public class MainActivity extends AppCompatActivity {
         Imgproc.cvtColor(cir, hsv_mat, Imgproc.COLOR_RGB2HSV);
         Imgproc.cvtColor(cir, gray_mat, Imgproc.COLOR_RGB2GRAY);
 
+        // Extract the value of R G S gray channel
         for (int a=0; a<h; a++) {
             for (int b=0; b<w; b++) {
                 if (Math.pow(a-center, 2) + Math.pow(b-center*1.5, 2) < Math.pow(center*0.5, 2)) {
@@ -640,7 +704,9 @@ public class MainActivity extends AppCompatActivity {
         S = S/number;
         GR = GR/number;
 
+        // Formula to calculate concentration
         Concentration = 3.44*R - 11.98*G + 12.04*GR + 6.32*S - 722.95;
+
         System.out.println(Concentration);
         String cc = String.format("%.2f",Concentration);
         tv1.setTextSize(30);
