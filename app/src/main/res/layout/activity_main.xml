@@ -15,10 +15,10 @@
         android:textColor="#000"
         android:textSize="30dp" />
 
-    <ImageView
-        android:id="@+id/img_photo"
-        android:layout_width="65dp"
-        android:layout_height="85dp" />
+<!--    <ImageView-->
+<!--        android:id="@+id/img_photo"-->
+<!--        android:layout_width="65dp"-->
+<!--        android:layout_height="85dp" />-->
 
     <ImageView
         android:id="@+id/imageView"
@@ -29,21 +29,31 @@
         android:id="@+id/btn_takephoto"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:textSize="30dp"
         android:text="📸" />
+    <Button
+        android:id="@+id/gallery"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:textSize="30dp"
+        android:text="gallery" />
     <Button
         android:id="@+id/load"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Load" />
+        android:textSize="30dp"
+        android:text="Load Images" />
     <Button
         android:id="@+id/button"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="execute" />
+        android:textSize="30dp"
+        android:text="image analysis" />
     <Button
         android:id="@+id/output"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Output" />
+        android:textSize="30dp"
+        android:text="signal Output" />
 
 </LinearLayout>
