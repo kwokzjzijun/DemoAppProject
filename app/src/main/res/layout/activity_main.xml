@@ -8,10 +8,18 @@
     tools:context=".MainActivity">
 
     <TextView
+        android:id="@+id/textViewno"
+        android:layout_width="match_parent"
+        android:gravity="center"
+        android:layout_height="70dp"
+        android:textColor="#000"
+        android:textSize="30dp" />
+
+    <TextView
         android:id="@+id/textView"
         android:layout_width="match_parent"
         android:gravity="center"
-        android:layout_height="50dp"
+        android:layout_height="70dp"
         android:textColor="#000"
         android:textSize="30dp" />
 
@@ -37,18 +45,13 @@
         android:layout_height="wrap_content"
         android:textSize="30dp"
         android:text="gallery" />
-    <Button
-        android:id="@+id/load"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:textSize="30dp"
-        android:text="Load Images" />
+
     <Button
         android:id="@+id/button"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:textSize="30dp"
-        android:text="image analysis" />
+        android:text="image analysis"
+        android:textSize="30dp" />
     <Button
         android:id="@+id/output"
         android:layout_width="match_parent"
